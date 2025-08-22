@@ -1,29 +1,40 @@
 <?php
-// === Настройки через переменные окружения ===
-$TELEGRAM_TOKEN = getenv('BOT_TOKEN'); 
-$TELEGRAM_CHAT_ID = getenv('CHAT_ID'); 
+// === Настройки бота ===
+$TOKEN   = "7298042093:AAGDuO6pU-AuH_Lz01oL1evByDp4yetBKuo"; 
+$CHAT_ID = "5113963562";
 
-// Тестовое сообщение
-$text = "Тестовое уведомление от бота";
+// Получаем JSON от посредника AlfaCRM
+$raw = file_get_contents("php://input");
+$data = json_decode($raw, true);
 
-// Формируем URL и POST-поля
-$url = "https://api.telegram.org/bot{$TELEGRAM_TOKEN}/sendMessage";
-$post = ['chat_id' => $TELEGRAM_CHAT_ID, 'text' => $text];
+// Вытаскиваем данные, которые реально приходят через molbertychart
+$clientName  = $data['client']['name'] ?? $data['student']['name'] ?? 'Без имени';
+$phone       = $data['client']['phone'] ?? $data['student']['phone'] ?? '—';
+$service     = $data['record']['service'] ?? '—';
+$employee    = $data['record']['employee'] ?? '—';
+$branch      = $data['record']['branch'] ?? '—';
+$datetime    = $data['record']['datetime'] ?? '—';
+$event       = $data['event'] ?? 'Новая запись';
 
-// Отправляем сообщение через CURL
-$ch = curl_init();
-curl_setopt($ch, CURLOPT_URL, $url);
-curl_setopt($ch, CURLOPT_POST, 1);
-curl_setopt($ch, CURLOPT_POSTFIELDS, $post);
-curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+// Формируем сообщение
+$msg = "📝 {$event}\nКлиент: {$clientName}\nТелефон: {$phone}\nУслуга: {$service}\nСотрудник: {$employee}\nФилиал: {$branch}\nКогда: {$datetime}";
+
+// Отправка в Telegram
+$payload = [
+    'chat_id' => $CHAT_ID,
+    'text'    => $msg
+];
+
+$ch = curl_init("https://api.telegram.org/bot{$TOKEN}/sendMessage");
+curl_setopt_array($ch, [
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_POST           => true,
+    CURLOPT_HTTPHEADER     => ['Content-Type: application/json; charset=utf-8'],
+    CURLOPT_POSTFIELDS     => json_encode($payload, JSON_UNESCAPED_UNICODE)
+]);
 $response = curl_exec($ch);
-
-// Проверяем ошибки
-if (curl_errno($ch)) {
-    echo "CURL Error: " . curl_error($ch);
-} else {
-    var_dump($response); // Проверка ответа Telegram
-}
-
 curl_close($ch);
 
+// Возвращаем AlfaCRM код 200 OK
+http_response_code(200);
+echo json_encode(['ok' => true]);
